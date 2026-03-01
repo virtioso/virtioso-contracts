@@ -6,7 +6,11 @@
 
 #pragma once
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
+#endif
 
 typedef enum vio_trace_source_id {
     VIO_TRACE_SRC_GUEST_EL1 = 6,

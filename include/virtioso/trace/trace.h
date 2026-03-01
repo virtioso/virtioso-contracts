@@ -5,7 +5,11 @@
  */
 #pragma once
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
+#endif
 
 #include <virtioso/trace/trace_contract.h>
 #include <virtioso/trace/backend.h>
