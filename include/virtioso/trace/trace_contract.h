@@ -68,6 +68,12 @@ typedef enum vio_trace_event_id {
     /* RPC ring doorbell marker emitted immediately before vso_doorbell():
      * a0=op, a1=mr1, a2=mr2, a3=mr3. */
     VIO_TRACE_EV_RING_DOORBELL = 34,
+    /* libsel4vm fault-advance marker:
+     * a0=vcpu_id, a1=fault_addr, a2=fault_ip, a3=0. */
+    VIO_TRACE_EV_ADVANCE_VCPU_FAULT = 35,
+    /* libsel4vm fault-restart marker:
+     * a0=vcpu_id, a1=fault_addr, a2=fault_ip, a3=0. */
+    VIO_TRACE_EV_RESTART_VCPU_FAULT = 36,
 } vio_trace_event_id_t;
 
 typedef struct vio_trace_payload4 {
