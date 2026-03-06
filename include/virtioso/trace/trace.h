@@ -22,3 +22,57 @@ static inline void vio_trace_emit(uint8_t event,
 {
     vio_trace_backend_emit(event, arg0, arg1, arg2, arg3);
 }
+
+static inline void vio_trace_mmio_begin_std(uint64_t addr,
+                                            uint64_t len,
+                                            uint64_t dir,
+                                            uint64_t value)
+{
+    vio_trace_payload4_t p = vio_trace_mmio_pack_std(addr, len, dir, value);
+    vio_trace_emit(VIO_TRACE_EV_MMIO_BEGIN, p.a0, p.a1, p.a2, p.a3);
+}
+
+static inline void vio_trace_mmio_end_std(uint64_t addr,
+                                          uint64_t len,
+                                          uint64_t dir,
+                                          uint64_t value)
+{
+    vio_trace_payload4_t p = vio_trace_mmio_pack_std(addr, len, dir, value);
+    vio_trace_emit(VIO_TRACE_EV_MMIO_END, p.a0, p.a1, p.a2, p.a3);
+}
+
+static inline void vio_trace_mmio_error_std(uint64_t addr,
+                                            uint64_t len,
+                                            uint64_t dir,
+                                            uint64_t error_code)
+{
+    vio_trace_payload4_t p = vio_trace_mmio_pack_std(addr, len, dir, error_code);
+    vio_trace_emit(VIO_TRACE_EV_MMIO_ERROR, p.a0, p.a1, p.a2, p.a3);
+}
+
+static inline void vio_trace_mmio_begin_qemu(uint64_t addr_space,
+                                             uint64_t dir,
+                                             uint64_t addr,
+                                             uint64_t value)
+{
+    vio_trace_payload4_t p = vio_trace_mmio_pack_qemu(addr_space, dir, addr, value);
+    vio_trace_emit(VIO_TRACE_EV_MMIO_BEGIN, p.a0, p.a1, p.a2, p.a3);
+}
+
+static inline void vio_trace_mmio_end_qemu(uint64_t addr_space,
+                                           uint64_t dir,
+                                           uint64_t addr,
+                                           uint64_t value)
+{
+    vio_trace_payload4_t p = vio_trace_mmio_pack_qemu(addr_space, dir, addr, value);
+    vio_trace_emit(VIO_TRACE_EV_MMIO_END, p.a0, p.a1, p.a2, p.a3);
+}
+
+static inline void vio_trace_mmio_error_qemu(uint64_t addr_space,
+                                             uint64_t dir,
+                                             uint64_t addr,
+                                             uint64_t error_code)
+{
+    vio_trace_payload4_t p = vio_trace_mmio_pack_qemu(addr_space, dir, addr, error_code);
+    vio_trace_emit(VIO_TRACE_EV_MMIO_ERROR, p.a0, p.a1, p.a2, p.a3);
+}

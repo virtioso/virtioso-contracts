@@ -50,18 +50,18 @@ typedef enum vio_trace_event_id {
     VIO_TRACE_EV_VM_CREATE_BEGIN = 20,
     VIO_TRACE_EV_VM_CREATE_END = 21,
     VIO_TRACE_EV_VM_CREATE_ERROR = 22,
-    VIO_TRACE_EV_VM1_CONSOLE_INIT_ENTER = 23,
-    VIO_TRACE_EV_VM1_CONSOLE_INIT_EXIT = 24,
-    VIO_TRACE_EV_VM1_CONSOLE_INIT_ERROR = 25,
+    VIO_TRACE_EV_VIRTIO_CONSOLE_INIT_ENTER = 23,
+    VIO_TRACE_EV_VIRTIO_CONSOLE_INIT_EXIT = 24,
+    VIO_TRACE_EV_VIRTIO_CONSOLE_INIT_ERROR = 25,
     VIO_TRACE_EV_VM0_QEMU_LAUNCH = 26,
     VIO_TRACE_EV_VM0_QEMU_HEARTBEAT = 27,
     VIO_TRACE_EV_VM0_QEMU_EXIT = 28,
-    VIO_TRACE_EV_VM1_CONSOLE_CLASS_READY = 29,
-    VIO_TRACE_EV_VM1_CONSOLE_DRIVER_REG_BEGIN = 30,
-    VIO_TRACE_EV_VM1_CONSOLE_DRIVER_REG_END = 31,
-    /* VM1 virtio_console probe progress marker:
+    VIO_TRACE_EV_VIRTIO_CONSOLE_CLASS_READY = 29,
+    VIO_TRACE_EV_VIRTIO_CONSOLE_DRIVER_REG_BEGIN = 30,
+    VIO_TRACE_EV_VIRTIO_CONSOLE_DRIVER_REG_END = 31,
+    /* Virtio-console probe progress marker:
      * a0=step_id, a1=detail0, a2=detail1, a3=rc_or_aux. */
-    VIO_TRACE_EV_VM1_CONSOLE_PROBE_STEP = 32,
+    VIO_TRACE_EV_VIRTIO_CONSOLE_PROBE_STEP = 32,
     /* Generic guest IRQ receive marker:
      * a0=hwirq, a1=linux_irq, a2=reserved, a3=reserved. */
     VIO_TRACE_EV_GUEST_IRQ_RECEIVE = 33,
@@ -69,6 +69,43 @@ typedef enum vio_trace_event_id {
      * a0=op, a1=mr1, a2=mr2, a3=mr3. */
     VIO_TRACE_EV_RING_DOORBELL = 34,
 } vio_trace_event_id_t;
+
+typedef struct vio_trace_payload4 {
+    uint64_t a0;
+    uint64_t a1;
+    uint64_t a2;
+    uint64_t a3;
+} vio_trace_payload4_t;
+
+/* MMIO payload layout for guest-el1 and VMM producers:
+ * a0=addr, a1=len, a2=dir, a3=value_or_error */
+static inline vio_trace_payload4_t vio_trace_mmio_pack_std(uint64_t addr,
+                                                           uint64_t len,
+                                                           uint64_t dir,
+                                                           uint64_t value_or_error)
+{
+    return (vio_trace_payload4_t){
+        .a0 = addr,
+        .a1 = len,
+        .a2 = dir,
+        .a3 = value_or_error,
+    };
+}
+
+/* MMIO payload layout for QEMU guest-el0 producer:
+ * a0=addr_space, a1=dir, a2=addr, a3=value_or_error */
+static inline vio_trace_payload4_t vio_trace_mmio_pack_qemu(uint64_t addr_space,
+                                                            uint64_t dir,
+                                                            uint64_t addr,
+                                                            uint64_t value_or_error)
+{
+    return (vio_trace_payload4_t){
+        .a0 = addr_space,
+        .a1 = dir,
+        .a2 = addr,
+        .a3 = value_or_error,
+    };
+}
 
 static inline uint16_t vio_trace_pack_src_prod(vio_trace_source_id_t source,
                                                vio_trace_producer_id_t producer)
