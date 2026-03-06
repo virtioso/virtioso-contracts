@@ -7,6 +7,7 @@
 
 #ifdef __KERNEL__
 #include <linux/atomic.h>
+#include <asm/barrier.h>
 #include <linux/string.h>
 #include <linux/bitmap.h>
 #include <linux/kernel.h>
@@ -25,6 +26,14 @@ typedef unsigned long seL4_Word;
 
 #define atomic_load_acquire(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
 #define atomic_store_release(ptr, i)  __atomic_store_n(ptr, i, __ATOMIC_RELEASE)
+
+#ifdef __KERNEL__
+#define rpcmsg_write_barrier() smp_wmb()
+#define rpcmsg_read_barrier() smp_rmb()
+#else
+#define rpcmsg_write_barrier() __atomic_thread_fence(__ATOMIC_RELEASE)
+#define rpcmsg_read_barrier() __atomic_thread_fence(__ATOMIC_ACQUIRE)
+#endif
 
 #ifndef __KERNEL__
 #define atomic_compare_and_swap(_p, _o, _n) __atomic_compare_exchange_n(_p, _o, _n, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)
@@ -313,6 +322,7 @@ int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 
 	/* enqueue entry */
 	enqueue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
+	rpcmsg_write_barrier();
 	rpcmsg_commit_update(&q->prod);
 
 	return 0;
@@ -333,6 +343,8 @@ int rpcmsg_dequeue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 		/* empty */
 		return -1;
 	}
+
+	rpcmsg_read_barrier();
 
 	/* dequeue entry */
 	dequeue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
@@ -629,4 +641,3 @@ int rpcmsg_forward(rpcmsg_rpc_queue_t *rpc, rpcmsg_t *msg)
 
 	return rpcmsg_enqueue(rpc->queue, rpc->buffer, rpcmsg_rpc_enqueue_fn, msg);
 }
-
