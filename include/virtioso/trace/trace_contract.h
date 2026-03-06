@@ -74,6 +74,9 @@ typedef enum vio_trace_event_id {
     /* libsel4vm fault-restart marker:
      * a0=vcpu_id, a1=fault_addr, a2=fault_ip, a3=0. */
     VIO_TRACE_EV_RESTART_VCPU_FAULT = 36,
+    /* kmod userspace-forward marker:
+     * a0=op, a1=mr1, a2=mr2, a3=mr3. */
+    VIO_TRACE_EV_RPC_FWD = 37,
 } vio_trace_event_id_t;
 
 typedef struct vio_trace_payload4 {
