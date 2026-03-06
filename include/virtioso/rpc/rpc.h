@@ -168,6 +168,11 @@ static inline int vso_doorbell(vso_rpc_t *rpc)
 	return 0;
 }
 
+static inline uint64_t rpc_trace_pack_id_op(uint16_t id, unsigned int op)
+{
+	return ((uint64_t)id << 32) | (uint32_t)op;
+}
+
 
 static inline int driver_rpc_request(vso_rpc_t *rpc, unsigned int op,
 				     seL4_Word mr0, seL4_Word mr1,
@@ -186,6 +191,10 @@ static inline int driver_rpc_request(vso_rpc_t *rpc, unsigned int op,
 		return err;
 	}
 
+	vio_trace_emit(VIO_TRACE_EV_RPC_REQ,
+		       rpc_trace_pack_id_op((uint16_t)err, op),
+		       mr1, mr2, mr3);
+
 	/* FIXME: return buffer id */
 	return vso_doorbell(rpc);
 }
@@ -194,6 +203,11 @@ static inline int driver_rpc_request_fwd(vso_rpc_t *dst, rpcmsg_t *msg)
 {
 	rpc_assert(dst);
 	rpc_assert(msg);
+
+	vio_trace_emit(VIO_TRACE_EV_RPC_FWD,
+		       rpc_trace_pack_id_op(rpcmsg_msg_to_id(dst->driver_rpc.request.buffer, msg),
+					    QEMU_OP(msg->mr0)),
+		       msg->mr1, msg->mr2, msg->mr3);
 
 	return rpcmsg_forward(&dst->driver_rpc.request, msg);
 }
