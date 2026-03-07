@@ -74,19 +74,6 @@ typedef enum vio_trace_event_id {
     /* libsel4vm fault-restart marker:
      * a0=vcpu_id, a1=fault_addr, a2=fault_ip, a3=0. */
     VIO_TRACE_EV_RESTART_VCPU_FAULT = 36,
-    /* kmod userspace-forward marker:
-     * a0=op, a1=mr1, a2=mr2, a3=mr3. */
-    VIO_TRACE_EV_RPC_FWD = 37,
-    /* kmod dequeue-state marker:
-     * a0=packed_id_op, a1=mr3(token), a2=prod.head.raw, a3=cons.head.raw. */
-    VIO_TRACE_EV_RPC_DEQ_STATE = 38,
-    /* kmod forward-queue state marker:
-     * a0=packed_id_op, a1=packed(src_depth,dst_depth),
-     * a2=dst.prod.head.raw, a3=dst.cons.head.raw. */
-    VIO_TRACE_EV_RPC_FWD_STATE = 39,
-    /* kmod forward-queue error marker:
-     * a0=packed_id_op, a1=rc, a2=dst.prod.head.raw, a3=dst.cons.head.raw. */
-    VIO_TRACE_EV_RPC_FWD_ERROR = 40,
 } vio_trace_event_id_t;
 
 typedef struct vio_trace_payload4 {

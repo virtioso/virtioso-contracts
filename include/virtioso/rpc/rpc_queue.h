@@ -157,7 +157,6 @@ typedef void rpcmsg_dequeue_elem_fn_t(rpcmsg_queue_t *q,
 				      rpcmsg_buffer_t *b,
 				      uint32_t ring_index,
 				      void * const rx_data);
-typedef void rpcmsg_sync_fn_t(void *cookie);
 
 __maybe_unused static void rpcmsg_queue_init(rpcmsg_queue_t * const q)
 {
@@ -305,12 +304,8 @@ void rpcmsg_commit_update(volatile rpcmsg_queue_bound_t *bound)
 	} while (!atomic_compare_and_swap(&bound->head.raw, (uint64_t *)(uintptr_t)&oh.raw, nh.raw));
 }
 
-static inline
-int rpcmsg_enqueue_sync(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
-			rpcmsg_enqueue_elem_fn_t enqueue_fn,
-			void const * const data,
-			rpcmsg_sync_fn_t *sync_fn,
-			void *sync_cookie)
+int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
+		   rpcmsg_enqueue_elem_fn_t enqueue_fn, void const * const data)
 {
 	uint32_t entry;
 
@@ -327,31 +322,9 @@ int rpcmsg_enqueue_sync(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 	/* enqueue entry */
 	enqueue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
 	rpcmsg_write_barrier();
-	if (sync_fn) {
-		/*
-		 * Make the payload/ring entry visible before publishing the new
-		 * producer head, then sync once more after commit so consumers
-		 * also observe the updated queue marker through non-coherent
-		 * shared mappings.
-		 */
-		sync_fn(sync_cookie);
-		rpcmsg_write_barrier();
-	}
 	rpcmsg_commit_update(&q->prod);
-	if (sync_fn) {
-		rpcmsg_write_barrier();
-		sync_fn(sync_cookie);
-		rpcmsg_write_barrier();
-	}
 
 	return 0;
-}
-
-static inline
-int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
-		   rpcmsg_enqueue_elem_fn_t enqueue_fn, void const * const data)
-{
-	return rpcmsg_enqueue_sync(q, b, enqueue_fn, data, NULL, NULL);
 }
 
 static inline
@@ -375,49 +348,6 @@ int rpcmsg_dequeue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 	/* dequeue entry */
 	dequeue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
 	rpcmsg_commit_update(&q->cons);
-
-	return 0;
-}
-
-static inline
-int rpcmsg_dequeue_sync(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
-			rpcmsg_dequeue_elem_fn_t dequeue_fn, void * const data,
-			rpcmsg_sync_fn_t *sync_fn, void *sync_cookie)
-{
-	uint32_t entry;
-
-	rpc_assert(q);
-	rpc_assert(b);
-	rpc_assert(dequeue_fn);
-	rpc_assert(data);
-
-	if (rpcmsg_acquire_cons_entry(q, &entry)) {
-		/* empty */
-		return -1;
-	}
-
-	if (sync_fn) {
-		/*
-		 * Refresh the shared queue/ring state after acquiring the
-		 * consumer slot but before reading the ring entry. Sync again
-		 * after publishing the updated consumer head so producers see
-		 * reclaimed entries through non-coherent mappings too.
-		 */
-		sync_fn(sync_cookie);
-		rpcmsg_read_barrier();
-	}
-
-	rpcmsg_read_barrier();
-
-	/* dequeue entry */
-	dequeue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
-	rpcmsg_commit_update(&q->cons);
-
-	if (sync_fn) {
-		rpcmsg_write_barrier();
-		sync_fn(sync_cookie);
-		rpcmsg_write_barrier();
-	}
 
 	return 0;
 }
@@ -676,24 +606,6 @@ rpcmsg_t *rpcmsg_receive(rpcmsg_rpc_queue_t *rpc)
 	return NULL;
 }
 
-static inline
-rpcmsg_t *rpcmsg_receive_sync(rpcmsg_rpc_queue_t *rpc,
-			      rpcmsg_sync_fn_t *sync_fn,
-			      void *sync_cookie)
-{
-	rpcmsg_t *msg;
-
-	rpc_assert(rpc);
-
-	if (!rpcmsg_dequeue_sync(rpc->queue, rpc->buffer, rpcmsg_rpc_dequeue_fn,
-				 &msg, sync_fn, sync_cookie)) {
-		return msg;
-	}
-
-	return NULL;
-}
-
-static inline
 int rpcmsg_reply(rpcmsg_rpc_queue_t *rpc, rpcmsg_t *msg)
 {
 	rpc_assert(rpc);
@@ -719,27 +631,6 @@ rpcmsg_t *rpcmsg_receive_response(rpcmsg_rpc_queue_t *rpc,
 	return msg;
 }
 
-static inline
-rpcmsg_t *rpcmsg_receive_response_sync(rpcmsg_rpc_queue_t *rpc,
-				       uint16_t *transaction_id,
-				       rpcmsg_sync_fn_t *sync_fn,
-				       void *sync_cookie)
-{
-	rpcmsg_t *msg = NULL;
-
-	rpc_assert(rpc);
-
-	if (!rpcmsg_dequeue_sync(rpc->queue, rpc->buffer, rpcmsg_rpc_dequeue_fn,
-				 &msg, sync_fn, sync_cookie)) {
-		if (transaction_id) {
-			*transaction_id = rpcmsg_msg_to_id(rpc->buffer, msg);
-		}
-	}
-
-	return msg;
-}
-
-static inline
 int rpcmsg_forward(rpcmsg_rpc_queue_t *rpc, rpcmsg_t *msg)
 {
 	rpc_assert(rpc);
