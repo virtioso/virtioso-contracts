@@ -13,7 +13,9 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/compiler_attributes.h>
+#include <linux/sched.h>
 #else
+#include <sched.h>
 #include <string.h>
 #include <assert.h>
 #include <inttypes.h>
@@ -210,7 +212,11 @@ rpcmsg_t *rpcmsg_id_to_msg(rpcmsg_buffer_t * const buffer, uint16_t id)
 static inline
 void rpcmsg_plat_yield(void)
 {
-	/* FIXME: sleep/yield/schedule */
+#ifdef __KERNEL__
+	cond_resched();
+#else
+	sched_yield();
+#endif
 }
 
 static inline
