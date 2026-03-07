@@ -77,6 +77,9 @@ typedef enum vio_trace_event_id {
     /* kmod userspace-forward marker:
      * a0=op, a1=mr1, a2=mr2, a3=mr3. */
     VIO_TRACE_EV_RPC_FWD = 37,
+    /* kmod dequeue-state marker:
+     * a0=packed_id_op, a1=mr3(token), a2=prod.head.raw, a3=cons.head.raw. */
+    VIO_TRACE_EV_RPC_DEQ_STATE = 38,
 } vio_trace_event_id_t;
 
 typedef struct vio_trace_payload4 {
