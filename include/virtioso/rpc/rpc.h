@@ -185,6 +185,11 @@ static inline void vso_sync_for_cpu(vso_rpc_t *rpc)
 	}
 }
 
+static inline void vso_sync_for_device_cookie(void *cookie)
+{
+	vso_sync_for_device((vso_rpc_t *)cookie);
+}
+
 static inline uint64_t rpc_trace_pack_id_op(uint16_t id, unsigned int op)
 {
 	return ((uint64_t)id << 32) | (uint32_t)op;
@@ -196,24 +201,39 @@ static inline int driver_rpc_request(vso_rpc_t *rpc, unsigned int op,
 				     seL4_Word mr2, seL4_Word mr3)
 {
 	int err;
+	rpcmsg_t *msg;
 
 	rpc_assert(rpc);
 
 	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_OP, op);
 
-	err = rpcmsg_request(&rpc->driver_rpc.request,
-			     rpc->driver_rpc.buffer_state,
-			     mr0, mr1, mr2, mr3);
-	if (err < 0) {
-		return err;
+	msg = rpcmsg_lend_buffer(&rpc->driver_rpc.request,
+				 rpc->driver_rpc.buffer_state);
+	if (!msg) {
+		return -1;
 	}
+
+	msg->mr0 = mr0;
+	msg->mr1 = mr1;
+	msg->mr2 = mr2;
+	msg->mr3 = mr3;
+
+	if (rpcmsg_enqueue_sync(rpc->driver_rpc.request.queue,
+				rpc->driver_rpc.request.buffer,
+				rpcmsg_rpc_enqueue_fn, msg,
+				vso_sync_for_device_cookie, rpc)) {
+		rpcmsg_reclaim_buffer(&rpc->driver_rpc.request,
+				      rpc->driver_rpc.buffer_state, msg);
+		return -1;
+	}
+
+	err = (int)rpcmsg_msg_to_id(rpc->driver_rpc.request.buffer, msg);
 
 	vio_trace_emit(VIO_TRACE_EV_RPC_REQ,
 		       rpc_trace_pack_id_op((uint16_t)err, op),
 		       mr1, mr2, mr3);
 
 	/* FIXME: return buffer id */
-	vso_sync_for_device(rpc);
 	return vso_doorbell(rpc);
 }
 
@@ -227,7 +247,10 @@ static inline int driver_rpc_request_fwd(vso_rpc_t *dst, rpcmsg_t *msg)
 					    QEMU_OP(msg->mr0)),
 		       msg->mr1, msg->mr2, msg->mr3);
 
-	return rpcmsg_forward(&dst->driver_rpc.request, msg);
+	return rpcmsg_enqueue_sync(dst->driver_rpc.request.queue,
+				   dst->driver_rpc.request.buffer,
+				   rpcmsg_rpc_enqueue_fn, msg,
+				   vso_sync_for_device_cookie, dst);
 }
 
 static inline int driver_rpc_reply(vso_rpc_t *rpc, rpcmsg_t *msg)
@@ -237,12 +260,14 @@ static inline int driver_rpc_reply(vso_rpc_t *rpc, rpcmsg_t *msg)
 	rpc_assert(rpc);
 	rpc_assert(msg);
 
-	err = rpcmsg_reply(&rpc->driver_rpc.response, msg);
+	err = rpcmsg_enqueue_sync(rpc->driver_rpc.response.queue,
+				  rpc->driver_rpc.response.buffer,
+				  rpcmsg_rpc_enqueue_fn, msg,
+				  vso_sync_for_device_cookie, rpc);
 	if (err) {
 		return err;
 	}
 
-	vso_sync_for_device(rpc);
 	return vso_doorbell(rpc);
 }
 
@@ -261,13 +286,24 @@ static inline int device_event_tx(vso_rpc_t *rpc, unsigned int op,
 
 	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_OP, op);
 
-	err = rpcmsg_event_tx(&rpc->device_event, mr0, mr1, mr2, mr3);
+	{
+		rpcmsg_t msg = {
+			.mr0 = mr0,
+			.mr1 = mr1,
+			.mr2 = mr2,
+			.mr3 = mr3,
+		};
+
+		err = rpcmsg_enqueue_sync(rpc->device_event.queue,
+					  rpc->device_event.buffer,
+					  rpcmsg_event_enqueue_fn, &msg,
+					  vso_sync_for_device_cookie, rpc);
+	}
 	if (err) {
 		return err;
 	}
 
 	vio_trace_emit(VIO_TRACE_EV_RING_DOORBELL, op, mr1, mr2, mr3);
-	vso_sync_for_device(rpc);
 	return vso_doorbell(rpc);
 }
 

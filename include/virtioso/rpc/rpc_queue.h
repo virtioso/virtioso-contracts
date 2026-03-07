@@ -157,6 +157,7 @@ typedef void rpcmsg_dequeue_elem_fn_t(rpcmsg_queue_t *q,
 				      rpcmsg_buffer_t *b,
 				      uint32_t ring_index,
 				      void * const rx_data);
+typedef void rpcmsg_sync_fn_t(void *cookie);
 
 __maybe_unused static void rpcmsg_queue_init(rpcmsg_queue_t * const q)
 {
@@ -305,8 +306,11 @@ void rpcmsg_commit_update(volatile rpcmsg_queue_bound_t *bound)
 }
 
 static inline
-int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
-		   rpcmsg_enqueue_elem_fn_t enqueue_fn, void const * const data)
+int rpcmsg_enqueue_sync(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
+			rpcmsg_enqueue_elem_fn_t enqueue_fn,
+			void const * const data,
+			rpcmsg_sync_fn_t *sync_fn,
+			void *sync_cookie)
 {
 	uint32_t entry;
 
@@ -323,9 +327,20 @@ int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 	/* enqueue entry */
 	enqueue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
 	rpcmsg_write_barrier();
+	if (sync_fn) {
+		sync_fn(sync_cookie);
+		rpcmsg_write_barrier();
+	}
 	rpcmsg_commit_update(&q->prod);
 
 	return 0;
+}
+
+static inline
+int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
+		   rpcmsg_enqueue_elem_fn_t enqueue_fn, void const * const data)
+{
+	return rpcmsg_enqueue_sync(q, b, enqueue_fn, data, NULL, NULL);
 }
 
 static inline
