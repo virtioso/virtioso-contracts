@@ -137,6 +137,9 @@ typedef struct vso_rpc {
 
 	void (*doorbell)(void *doorbell_cookie);
 	void *doorbell_cookie;
+	void (*sync_for_device)(void *sync_cookie);
+	void (*sync_for_cpu)(void *sync_cookie);
+	void *sync_cookie;
 } vso_rpc_t;
 
 #define for_each_rpc_msg(_msg, _queue)	\
@@ -168,6 +171,20 @@ static inline int vso_doorbell(vso_rpc_t *rpc)
 	return 0;
 }
 
+static inline void vso_sync_for_device(vso_rpc_t *rpc)
+{
+	if (rpc && rpc->sync_for_device) {
+		rpc->sync_for_device(rpc->sync_cookie);
+	}
+}
+
+static inline void vso_sync_for_cpu(vso_rpc_t *rpc)
+{
+	if (rpc && rpc->sync_for_cpu) {
+		rpc->sync_for_cpu(rpc->sync_cookie);
+	}
+}
+
 static inline uint64_t rpc_trace_pack_id_op(uint16_t id, unsigned int op)
 {
 	return ((uint64_t)id << 32) | (uint32_t)op;
@@ -196,6 +213,7 @@ static inline int driver_rpc_request(vso_rpc_t *rpc, unsigned int op,
 		       mr1, mr2, mr3);
 
 	/* FIXME: return buffer id */
+	vso_sync_for_device(rpc);
 	return vso_doorbell(rpc);
 }
 
@@ -224,6 +242,7 @@ static inline int driver_rpc_reply(vso_rpc_t *rpc, rpcmsg_t *msg)
 		return err;
 	}
 
+	vso_sync_for_device(rpc);
 	return vso_doorbell(rpc);
 }
 
@@ -248,6 +267,7 @@ static inline int device_event_tx(vso_rpc_t *rpc, unsigned int op,
 	}
 
 	vio_trace_emit(VIO_TRACE_EV_RING_DOORBELL, op, mr1, mr2, mr3);
+	vso_sync_for_device(rpc);
 	return vso_doorbell(rpc);
 }
 
