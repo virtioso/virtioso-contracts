@@ -379,6 +379,49 @@ int rpcmsg_dequeue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 	return 0;
 }
 
+static inline
+int rpcmsg_dequeue_sync(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
+			rpcmsg_dequeue_elem_fn_t dequeue_fn, void * const data,
+			rpcmsg_sync_fn_t *sync_fn, void *sync_cookie)
+{
+	uint32_t entry;
+
+	rpc_assert(q);
+	rpc_assert(b);
+	rpc_assert(dequeue_fn);
+	rpc_assert(data);
+
+	if (rpcmsg_acquire_cons_entry(q, &entry)) {
+		/* empty */
+		return -1;
+	}
+
+	if (sync_fn) {
+		/*
+		 * Refresh the shared queue/ring state after acquiring the
+		 * consumer slot but before reading the ring entry. Sync again
+		 * after publishing the updated consumer head so producers see
+		 * reclaimed entries through non-coherent mappings too.
+		 */
+		sync_fn(sync_cookie);
+		rpcmsg_read_barrier();
+	}
+
+	rpcmsg_read_barrier();
+
+	/* dequeue entry */
+	dequeue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
+	rpcmsg_commit_update(&q->cons);
+
+	if (sync_fn) {
+		rpcmsg_write_barrier();
+		sync_fn(sync_cookie);
+		rpcmsg_write_barrier();
+	}
+
+	return 0;
+}
+
 #define RPCMSG_F_INIT_BUFFER	1
 #define RPCMSG_F_INIT_QUEUE	2
 #define RPCMSG_F_INIT_ALL	(~0)
@@ -634,6 +677,23 @@ rpcmsg_t *rpcmsg_receive(rpcmsg_rpc_queue_t *rpc)
 }
 
 static inline
+rpcmsg_t *rpcmsg_receive_sync(rpcmsg_rpc_queue_t *rpc,
+			      rpcmsg_sync_fn_t *sync_fn,
+			      void *sync_cookie)
+{
+	rpcmsg_t *msg;
+
+	rpc_assert(rpc);
+
+	if (!rpcmsg_dequeue_sync(rpc->queue, rpc->buffer, rpcmsg_rpc_dequeue_fn,
+				 &msg, sync_fn, sync_cookie)) {
+		return msg;
+	}
+
+	return NULL;
+}
+
+static inline
 int rpcmsg_reply(rpcmsg_rpc_queue_t *rpc, rpcmsg_t *msg)
 {
 	rpc_assert(rpc);
@@ -651,6 +711,26 @@ rpcmsg_t *rpcmsg_receive_response(rpcmsg_rpc_queue_t *rpc,
 	rpc_assert(rpc);
 
 	if (!rpcmsg_dequeue(rpc->queue, rpc->buffer, rpcmsg_rpc_dequeue_fn, &msg)) {
+		if (transaction_id) {
+			*transaction_id = rpcmsg_msg_to_id(rpc->buffer, msg);
+		}
+	}
+
+	return msg;
+}
+
+static inline
+rpcmsg_t *rpcmsg_receive_response_sync(rpcmsg_rpc_queue_t *rpc,
+				       uint16_t *transaction_id,
+				       rpcmsg_sync_fn_t *sync_fn,
+				       void *sync_cookie)
+{
+	rpcmsg_t *msg = NULL;
+
+	rpc_assert(rpc);
+
+	if (!rpcmsg_dequeue_sync(rpc->queue, rpc->buffer, rpcmsg_rpc_dequeue_fn,
+				 &msg, sync_fn, sync_cookie)) {
 		if (transaction_id) {
 			*transaction_id = rpcmsg_msg_to_id(rpc->buffer, msg);
 		}

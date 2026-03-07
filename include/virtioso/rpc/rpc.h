@@ -142,24 +142,6 @@ typedef struct vso_rpc {
 	void *sync_cookie;
 } vso_rpc_t;
 
-#define for_each_rpc_msg(_msg, _queue)	\
-	for ((_msg) = rpcmsg_receive((_queue)); (_msg); (_msg) = rpcmsg_receive((_queue)))
-
-#define for_each_rpc_resp(_msg, _id, _buf_state, _queue)		\
-	for ((_msg) = rpcmsg_receive_response((_queue), &_id);		\
-	     (_msg);							\
-	     rpcmsg_reclaim_buffer((_queue), (_buf_state), (_msg)),	\
-	     (_msg) = rpcmsg_receive_response((_queue), &_id))
-
-#define for_each_driver_rpc_req(_msg, _rpc)	\
-	for_each_rpc_msg(_msg, &(_rpc)->driver_rpc.request)
-
-#define for_each_driver_rpc_resp(_msg, _id, _rpc)	\
-	for_each_rpc_resp((_msg), _id, (_rpc)->driver_rpc.buffer_state, &(_rpc)->driver_rpc.response)
-
-#define for_each_device_event(_msg, _rpc)	\
-	for (;!rpcmsg_event_rx(&(_rpc)->device_event, &_msg);)
-
 static inline int vso_doorbell(vso_rpc_t *rpc)
 {
 	if (!rpc || !rpc->doorbell) {
@@ -189,6 +171,54 @@ static inline void vso_sync_for_device_cookie(void *cookie)
 {
 	vso_sync_for_device((vso_rpc_t *)cookie);
 }
+
+static inline void vso_sync_for_cpu_cookie(void *cookie)
+{
+	vso_sync_for_cpu((vso_rpc_t *)cookie);
+}
+
+static inline rpcmsg_t *driver_rpc_receive_request(vso_rpc_t *rpc)
+{
+	rpc_assert(rpc);
+
+	return rpcmsg_receive_sync(&rpc->driver_rpc.request,
+				       vso_sync_for_cpu_cookie, rpc);
+}
+
+static inline rpcmsg_t *driver_rpc_receive_response(vso_rpc_t *rpc,
+						    uint16_t *transaction_id)
+{
+	rpc_assert(rpc);
+
+	return rpcmsg_receive_response_sync(&rpc->driver_rpc.response,
+					      transaction_id,
+					      vso_sync_for_cpu_cookie, rpc);
+}
+
+static inline int device_event_receive(vso_rpc_t *rpc, rpcmsg_t *msg)
+{
+	rpc_assert(rpc);
+
+	return rpcmsg_dequeue_sync(rpc->device_event.queue,
+				       rpc->device_event.buffer,
+				       rpcmsg_event_dequeue_fn, msg,
+				       vso_sync_for_cpu_cookie, rpc);
+}
+
+#define for_each_driver_rpc_req(_msg, _rpc)				\
+	for ((_msg) = driver_rpc_receive_request((_rpc));			\
+	     (_msg);								\
+	     (_msg) = driver_rpc_receive_request((_rpc)))
+
+#define for_each_driver_rpc_resp(_msg, _id, _rpc)				\
+	for ((_msg) = driver_rpc_receive_response((_rpc), &(_id));		\
+	     (_msg);								\
+	     rpcmsg_reclaim_buffer(&(_rpc)->driver_rpc.response,		\
+				     (_rpc)->driver_rpc.buffer_state, (_msg)),	\
+	     (_msg) = driver_rpc_receive_response((_rpc), &(_id)))
+
+#define for_each_device_event(_msg, _rpc)	\
+	for (; !device_event_receive((_rpc), &(_msg));)
 
 static inline uint64_t rpc_trace_pack_id_op(uint16_t id, unsigned int op)
 {
