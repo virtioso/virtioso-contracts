@@ -328,10 +328,21 @@ int rpcmsg_enqueue_sync(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 	enqueue_fn(q, b, entry & RPCMSG_BUFFER_MASK, data);
 	rpcmsg_write_barrier();
 	if (sync_fn) {
+		/*
+		 * Make the payload/ring entry visible before publishing the new
+		 * producer head, then sync once more after commit so consumers
+		 * also observe the updated queue marker through non-coherent
+		 * shared mappings.
+		 */
 		sync_fn(sync_cookie);
 		rpcmsg_write_barrier();
 	}
 	rpcmsg_commit_update(&q->prod);
+	if (sync_fn) {
+		rpcmsg_write_barrier();
+		sync_fn(sync_cookie);
+		rpcmsg_write_barrier();
+	}
 
 	return 0;
 }
