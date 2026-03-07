@@ -304,6 +304,7 @@ void rpcmsg_commit_update(volatile rpcmsg_queue_bound_t *bound)
 	} while (!atomic_compare_and_swap(&bound->head.raw, (uint64_t *)(uintptr_t)&oh.raw, nh.raw));
 }
 
+static inline
 int rpcmsg_enqueue(rpcmsg_queue_t *q, rpcmsg_buffer_t *b,
 		   rpcmsg_enqueue_elem_fn_t enqueue_fn, void const * const data)
 {
@@ -606,6 +607,7 @@ rpcmsg_t *rpcmsg_receive(rpcmsg_rpc_queue_t *rpc)
 	return NULL;
 }
 
+static inline
 int rpcmsg_reply(rpcmsg_rpc_queue_t *rpc, rpcmsg_t *msg)
 {
 	rpc_assert(rpc);
@@ -631,6 +633,7 @@ rpcmsg_t *rpcmsg_receive_response(rpcmsg_rpc_queue_t *rpc,
 	return msg;
 }
 
+static inline
 int rpcmsg_forward(rpcmsg_rpc_queue_t *rpc, rpcmsg_t *msg)
 {
 	rpc_assert(rpc);
