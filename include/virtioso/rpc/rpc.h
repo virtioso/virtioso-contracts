@@ -30,9 +30,16 @@ typedef enum rpcmsg_queue_id {
 	queue_id_last,
 } rpcmsg_queue_id_t;
 
+typedef struct rpcmsg_control {
+	volatile uint32_t pending;
+	uint32_t reserved;
+	rpcmsg_t msg;
+} rpcmsg_control_t;
+
 typedef struct rpcmsg_iobuf {
 	rpcmsg_buffer_t buffers[iobuf_id_last];
 	rpcmsg_queue_t queues[queue_id_last];
+	rpcmsg_control_t control;
 } rpcmsg_iobuf_t;
 
 #define IOBUF_NUM_PAGES 2
@@ -133,6 +140,7 @@ typedef struct vso_rpc {
 
 	/* requests from the device to driver */
 	vso_device_event_t device_event;
+	rpcmsg_control_t *control;
 
 	void (*doorbell)(void *doorbell_cookie);
 	void *doorbell_cookie;
@@ -234,23 +242,69 @@ static inline int device_event_tx(vso_rpc_t *rpc, unsigned int op,
 	return vso_doorbell(rpc);
 }
 
+static inline int device_control_tx(vso_rpc_t *rpc, unsigned int op,
+				    seL4_Word mr0, seL4_Word mr1,
+				    seL4_Word mr2, seL4_Word mr3)
+{
+	rpcmsg_control_t *control;
+
+	rpc_assert(rpc);
+	rpc_assert(rpc->control);
+
+	control = rpc->control;
+	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_OP, op);
+
+	while (atomic_load_acquire(&control->pending)) {
+		rpcmsg_plat_yield();
+	}
+
+	control->msg.mr0 = mr0;
+	control->msg.mr1 = mr1;
+	control->msg.mr2 = mr2;
+	control->msg.mr3 = mr3;
+	rpcmsg_write_barrier();
+	atomic_store_release(&control->pending, 1);
+
+	return vso_doorbell(rpc);
+}
+
+static inline int device_control_rx(vso_rpc_t *rpc, rpcmsg_t *msg)
+{
+	rpcmsg_control_t *control;
+
+	rpc_assert(rpc);
+	rpc_assert(rpc->control);
+	rpc_assert(msg);
+
+	control = rpc->control;
+	if (!atomic_load_acquire(&control->pending)) {
+		return -1;
+	}
+
+	rpcmsg_read_barrier();
+	*msg = control->msg;
+	atomic_store_release(&control->pending, 0);
+
+	return 0;
+}
+
 /* FIXME: convert these to synchronous RPC */
 static inline int device_rpc_req_start_vm(vso_rpc_t *rpc)
 {
-	return device_event_tx(rpc, QEMU_OP_START_VM, 0, 0, 0, 0);
+	return device_control_tx(rpc, QEMU_OP_START_VM, 0, 0, 0, 0);
 }
 
 static inline int device_rpc_req_create_vpci_device(vso_rpc_t *rpc,
 						seL4_Word pcidev)
 {
-	return device_event_tx(rpc, QEMU_OP_REGISTER_PCI_DEV, 0, pcidev, 0, 0);
+	return device_control_tx(rpc, QEMU_OP_REGISTER_PCI_DEV, 0, pcidev, 0, 0);
 }
 
 static inline int device_rpc_req_mmio_region_config(vso_rpc_t *rpc, uintptr_t gpa,
 						size_t size,
 						unsigned long flags)
 {
-	return device_event_tx(rpc, QEMU_OP_MMIO_REGION_CONFIG, 0, gpa, size, flags);
+	return device_control_tx(rpc, QEMU_OP_MMIO_REGION_CONFIG, 0, gpa, size, flags);
 }
 
 static inline int device_rpc_req_set_irqline(vso_rpc_t *rpc, seL4_Word irq)
@@ -345,6 +399,7 @@ static inline int vso_rpc_init(vso_rpc_t *rpc,
 	}
 
 	rpc->device_event = devevt_queue(iobuf);
+	rpc->control = &((rpcmsg_iobuf_t *)iobuf)->control;
 
 	rpc->doorbell = doorbell;
 	rpc->doorbell_cookie = doorbell_cookie;
