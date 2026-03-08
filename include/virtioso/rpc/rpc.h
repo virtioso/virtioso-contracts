@@ -365,9 +365,8 @@ static inline int driver_rpc_req_mmio_claim(vso_rpc_t *rpc, unsigned int slot,
 	}
 
 	mmio_slot = vso_rpc_mmio_slot(rpc, slot);
-	if (!__atomic_compare_exchange_n(&mmio_slot->state, &expected,
-					 VSO_MMIO_SLOT_CLAIMED, false,
-					 __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+	if (!atomic_compare_and_swap(&mmio_slot->state, &expected,
+				     VSO_MMIO_SLOT_CLAIMED)) {
 		return -1;
 	}
 
