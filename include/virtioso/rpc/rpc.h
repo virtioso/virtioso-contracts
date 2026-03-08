@@ -30,9 +30,43 @@ typedef enum rpcmsg_queue_id {
 	queue_id_last,
 } rpcmsg_queue_id_t;
 
+typedef enum vso_mmio_slot_state {
+	VSO_MMIO_SLOT_IDLE = 0,
+	VSO_MMIO_SLOT_PENDING = 1,
+	VSO_MMIO_SLOT_CLAIMED = 2,
+	VSO_MMIO_SLOT_COMPLETE = 3,
+} vso_mmio_slot_state_t;
+
+#define VSO_MMIO_SLOT_COUNT RPCMSG_BUFFER_SIZE
+
+typedef struct vso_mmio_request {
+	seL4_Word addr;
+	seL4_Word value;
+	uint64_t generation;
+	uint32_t addr_space;
+	uint16_t width;
+	uint8_t direction;
+	uint8_t reserved0;
+} vso_mmio_request_t;
+
+typedef struct vso_mmio_completion {
+	int32_t status;
+	uint32_t reserved0;
+	seL4_Word value;
+	uint64_t generation;
+} vso_mmio_completion_t;
+
+typedef struct vso_mmio_slot {
+	volatile uint32_t state;
+	uint32_t reserved0;
+	vso_mmio_request_t request;
+	vso_mmio_completion_t completion;
+} vso_mmio_slot_t;
+
 typedef struct rpcmsg_iobuf {
 	rpcmsg_buffer_t buffers[iobuf_id_last];
 	rpcmsg_queue_t queues[queue_id_last];
+	vso_mmio_slot_t mmio_slots[VSO_MMIO_SLOT_COUNT];
 } rpcmsg_iobuf_t;
 
 #define IOBUF_NUM_PAGES 2
@@ -133,10 +167,26 @@ typedef struct vso_rpc {
 
 	/* requests from the device to driver */
 	vso_device_event_t device_event;
+	vso_mmio_slot_t *mmio_slots;
 
 	void (*doorbell)(void *doorbell_cookie);
 	void *doorbell_cookie;
 } vso_rpc_t;
+
+static inline vso_mmio_slot_t *vso_rpc_mmio_slot(vso_rpc_t *rpc, unsigned int slot)
+{
+	rpc_assert(rpc);
+	rpc_assert(rpc->mmio_slots);
+	rpc_assert(slot < VSO_MMIO_SLOT_COUNT);
+
+	return &rpc->mmio_slots[slot];
+}
+
+static inline void vso_mmio_slots_init(vso_mmio_slot_t *slots)
+{
+	rpc_assert(slots);
+	memset(slots, 0, sizeof(*slots) * VSO_MMIO_SLOT_COUNT);
+}
 
 #define for_each_rpc_msg(_msg, _queue)	\
 	for ((_msg) = rpcmsg_receive((_queue)); (_msg); (_msg) = rpcmsg_receive((_queue)))
@@ -270,27 +320,135 @@ static inline int device_rpc_req_pulse_irqline(vso_rpc_t *rpc, seL4_Word irq)
 
 static inline int driver_rpc_req_mmio_start(vso_rpc_t *rpc, unsigned int direction,
 					    unsigned int addr_space, unsigned int slot,
+					    uint64_t generation,
 					    seL4_Word addr, seL4_Word len, seL4_Word data)
 {
-	seL4_Word mr0 = 0;
-	seL4_Word mr1 = 0;
-	seL4_Word mr2 = 0;
+	vso_mmio_slot_t *mmio_slot;
 
-	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_MMIO_DIRECTION, direction);
-	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_MMIO_ADDR_SPACE, addr_space);
-	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_MMIO_LENGTH, len);
-	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_MMIO_SLOT, slot);
-	mr1 = addr;
-	mr2 = data;
+	rpc_assert(rpc);
 
-	return driver_rpc_request(rpc, QEMU_OP_MMIO, mr0, mr1, mr2, 0);
+	if (slot >= VSO_MMIO_SLOT_COUNT) {
+		return -1;
+	}
+
+	mmio_slot = vso_rpc_mmio_slot(rpc, slot);
+	if (atomic_load_acquire(&mmio_slot->state) != VSO_MMIO_SLOT_IDLE) {
+		return -1;
+	}
+
+	memset(&mmio_slot->completion, 0, sizeof(mmio_slot->completion));
+	mmio_slot->request.addr = addr;
+	mmio_slot->request.value = data;
+	mmio_slot->request.generation = generation;
+	mmio_slot->request.addr_space = addr_space;
+	mmio_slot->request.width = len;
+	mmio_slot->request.direction = direction;
+	mmio_slot->request.reserved0 = 0;
+
+	rpcmsg_write_barrier();
+	atomic_store_release(&mmio_slot->state, VSO_MMIO_SLOT_PENDING);
+
+	return vso_doorbell(rpc);
 }
 
-static inline int driver_rpc_ack_mmio_finish(vso_rpc_t *rpc, rpcmsg_t *msg, seL4_Word data)
+static inline int driver_rpc_req_mmio_claim(vso_rpc_t *rpc, unsigned int slot,
+					    vso_mmio_request_t *request)
 {
-	msg->mr2 = data;
+	vso_mmio_slot_t *mmio_slot;
+	uint32_t expected = VSO_MMIO_SLOT_PENDING;
 
-	return driver_rpc_reply(rpc, msg);
+	rpc_assert(rpc);
+	rpc_assert(request);
+
+	if (slot >= VSO_MMIO_SLOT_COUNT) {
+		return -1;
+	}
+
+	mmio_slot = vso_rpc_mmio_slot(rpc, slot);
+	if (!__atomic_compare_exchange_n(&mmio_slot->state, &expected,
+					 VSO_MMIO_SLOT_CLAIMED, false,
+					 __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+		return -1;
+	}
+
+	rpcmsg_read_barrier();
+	*request = mmio_slot->request;
+	return 0;
+}
+
+static inline int driver_rpc_ack_mmio_finish(vso_rpc_t *rpc, unsigned int slot,
+					     int status, uint64_t generation,
+					     seL4_Word data)
+{
+	vso_mmio_slot_t *mmio_slot;
+
+	rpc_assert(rpc);
+
+	if (slot >= VSO_MMIO_SLOT_COUNT) {
+		return -1;
+	}
+
+	mmio_slot = vso_rpc_mmio_slot(rpc, slot);
+	if (atomic_load_acquire(&mmio_slot->state) != VSO_MMIO_SLOT_CLAIMED) {
+		return -1;
+	}
+
+	mmio_slot->completion.status = status;
+	mmio_slot->completion.reserved0 = 0;
+	mmio_slot->completion.value = data;
+	mmio_slot->completion.generation = generation;
+
+	rpcmsg_write_barrier();
+	atomic_store_release(&mmio_slot->state, VSO_MMIO_SLOT_COMPLETE);
+
+	return vso_doorbell(rpc);
+}
+
+static inline int driver_rpc_req_mmio_requeue(vso_rpc_t *rpc, unsigned int slot,
+					      uint64_t generation)
+{
+	vso_mmio_slot_t *mmio_slot;
+
+	rpc_assert(rpc);
+
+	if (slot >= VSO_MMIO_SLOT_COUNT) {
+		return -1;
+	}
+
+	mmio_slot = vso_rpc_mmio_slot(rpc, slot);
+	if (atomic_load_acquire(&mmio_slot->state) != VSO_MMIO_SLOT_CLAIMED ||
+	    mmio_slot->request.generation != generation) {
+		return -1;
+	}
+
+	atomic_store_release(&mmio_slot->state, VSO_MMIO_SLOT_PENDING);
+	return 0;
+}
+
+static inline int driver_rpc_ack_mmio_consume(vso_rpc_t *rpc, unsigned int slot,
+					      vso_mmio_completion_t *completion)
+{
+	vso_mmio_slot_t *mmio_slot;
+
+	rpc_assert(rpc);
+	rpc_assert(completion);
+
+	if (slot >= VSO_MMIO_SLOT_COUNT) {
+		return -1;
+	}
+
+	mmio_slot = vso_rpc_mmio_slot(rpc, slot);
+	if (atomic_load_acquire(&mmio_slot->state) != VSO_MMIO_SLOT_COMPLETE) {
+		return -1;
+	}
+
+	rpcmsg_read_barrier();
+	*completion = mmio_slot->completion;
+	memset(&mmio_slot->request, 0, sizeof(mmio_slot->request));
+	memset(&mmio_slot->completion, 0, sizeof(mmio_slot->completion));
+	atomic_store_release(&mmio_slot->state, VSO_MMIO_SLOT_IDLE);
+
+	return 0;
 }
 
 typedef enum vso_rpc_id {
@@ -313,6 +471,7 @@ static inline int vso_driver_rpc_init(vso_rpc_id_t id, void *iobuf, vso_driver_r
 		rpcmsg_call_queue_init(&drvrpc->request);
 		rpcmsg_reply_queue_init(&drvrpc->response);
 		rpcmsg_buffer_init(drvrpc->request.buffer);
+		vso_mmio_slots_init(((rpcmsg_iobuf_t *)iobuf)->mmio_slots);
 		break;
 	case vso_rpc_device_km:
 		drvrpc->request = device_km_drvrpc_req(iobuf);
@@ -345,6 +504,7 @@ static inline int vso_rpc_init(vso_rpc_t *rpc,
 	}
 
 	rpc->device_event = devevt_queue(iobuf);
+	rpc->mmio_slots = ((rpcmsg_iobuf_t *)iobuf)->mmio_slots;
 
 	rpc->doorbell = doorbell;
 	rpc->doorbell_cookie = doorbell_cookie;
