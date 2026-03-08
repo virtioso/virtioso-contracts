@@ -76,3 +76,12 @@ static inline void vio_trace_mmio_error_qemu(uint64_t addr_space,
     vio_trace_payload4_t p = vio_trace_mmio_pack_qemu(addr_space, dir, addr, error_code);
     vio_trace_emit(VIO_TRACE_EV_MMIO_ERROR, p.a0, p.a1, p.a2, p.a3);
 }
+
+static inline void vio_trace_mmio_slot_state(uint64_t slot,
+                                             uint64_t generation,
+                                             uint64_t phase_id,
+                                             uint64_t aux)
+{
+    vio_trace_emit(VIO_TRACE_EV_MMIO_SLOT_STATE, slot, generation,
+                   phase_id, aux);
+}

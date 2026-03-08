@@ -74,7 +74,17 @@ typedef enum vio_trace_event_id {
     /* libsel4vm fault-restart marker:
      * a0=vcpu_id, a1=fault_addr, a2=fault_ip, a3=0. */
     VIO_TRACE_EV_RESTART_VCPU_FAULT = 36,
+    /* MMIO slot lifecycle marker:
+     * a0=slot, a1=mmio_generation, a2=phase_id, a3=aux. */
+    VIO_TRACE_EV_MMIO_SLOT_STATE = 37,
 } vio_trace_event_id_t;
+
+typedef enum vio_trace_mmio_slot_phase_id {
+    VIO_TRACE_MMIO_SLOT_CLAIM = 1,
+    VIO_TRACE_MMIO_SLOT_DELEGATE = 2,
+    VIO_TRACE_MMIO_SLOT_REQUEUE = 3,
+    VIO_TRACE_MMIO_SLOT_COMPLETE = 4,
+} vio_trace_mmio_slot_phase_id_t;
 
 typedef struct vio_trace_payload4 {
     uint64_t a0;
