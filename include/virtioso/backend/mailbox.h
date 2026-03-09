@@ -7,8 +7,10 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
+typedef unsigned long virtioso_backend_word_t;
 #else
 #include <stdint.h>
+typedef uintptr_t virtioso_backend_word_t;
 #endif
 
 #ifndef static_assert
@@ -27,8 +29,8 @@ typedef enum virtioso_backend_slot_state {
 } virtioso_backend_slot_state_t;
 
 typedef struct virtioso_backend_request {
-	uint64_t addr;
-	uint64_t value;
+	virtioso_backend_word_t addr;
+	virtioso_backend_word_t value;
 	uint64_t generation;
 	uint32_t addr_space;
 	uint16_t width;
@@ -39,7 +41,7 @@ typedef struct virtioso_backend_request {
 typedef struct virtioso_backend_completion {
 	int32_t status;
 	uint32_t reserved0;
-	uint64_t value;
+	virtioso_backend_word_t value;
 	uint64_t generation;
 } virtioso_backend_completion_t;
 
