@@ -13,6 +13,7 @@
 #include <inttypes.h>
 #endif
 
+#include <virtioso/backend/mailbox.h>
 #include <virtioso/rpc/rpc_queue.h>
 
 typedef enum rpcmsg_iobuf_id {
@@ -30,38 +31,18 @@ typedef enum rpcmsg_queue_id {
 	queue_id_last,
 } rpcmsg_queue_id_t;
 
-typedef enum vso_mmio_slot_state {
-	VSO_MMIO_SLOT_IDLE = 0,
-	VSO_MMIO_SLOT_PENDING = 1,
-	VSO_MMIO_SLOT_CLAIMED = 2,
-	VSO_MMIO_SLOT_COMPLETE = 3,
-} vso_mmio_slot_state_t;
+typedef virtioso_backend_slot_state_t vso_mmio_slot_state_t;
 
-#define VSO_MMIO_SLOT_COUNT RPCMSG_BUFFER_SIZE
+#define VSO_MMIO_SLOT_IDLE     VIRTIOSO_BACKEND_SLOT_IDLE
+#define VSO_MMIO_SLOT_PENDING  VIRTIOSO_BACKEND_SLOT_PENDING
+#define VSO_MMIO_SLOT_CLAIMED  VIRTIOSO_BACKEND_SLOT_CLAIMED
+#define VSO_MMIO_SLOT_COMPLETE VIRTIOSO_BACKEND_SLOT_COMPLETE
 
-typedef struct vso_mmio_request {
-	seL4_Word addr;
-	seL4_Word value;
-	uint64_t generation;
-	uint32_t addr_space;
-	uint16_t width;
-	uint8_t direction;
-	uint8_t reserved0;
-} vso_mmio_request_t;
+#define VSO_MMIO_SLOT_COUNT VIRTIOSO_BACKEND_MAILBOX_SLOT_COUNT
 
-typedef struct vso_mmio_completion {
-	int32_t status;
-	uint32_t reserved0;
-	seL4_Word value;
-	uint64_t generation;
-} vso_mmio_completion_t;
-
-typedef struct vso_mmio_slot {
-	volatile uint32_t state;
-	uint32_t reserved0;
-	vso_mmio_request_t request;
-	vso_mmio_completion_t completion;
-} vso_mmio_slot_t;
+typedef virtioso_backend_request_t vso_mmio_request_t;
+typedef virtioso_backend_completion_t vso_mmio_completion_t;
+typedef virtioso_backend_slot_t vso_mmio_slot_t;
 
 typedef struct rpcmsg_iobuf {
 	rpcmsg_buffer_t buffers[iobuf_id_last];
