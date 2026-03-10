@@ -14,6 +14,7 @@
 #endif
 
 #include <virtioso/backend/mailbox.h>
+#include <virtioso/backend/control_mailbox.h>
 #include <virtioso/rpc/rpc_queue.h>
 
 typedef enum rpcmsg_iobuf_id {
@@ -149,6 +150,7 @@ typedef struct vso_rpc {
 	/* requests from the device to driver */
 	vso_device_event_t device_event;
 	vso_mmio_slot_t *mmio_slots;
+	virtioso_control_mailbox_t *control_mailbox;
 
 	void (*doorbell)(void *doorbell_cookie);
 	void *doorbell_cookie;
@@ -255,9 +257,12 @@ static inline int device_event_tx(vso_rpc_t *rpc, unsigned int op,
 {
 	int err;
 
-	mr0 = BIT_FIELD_SET(mr0, RPC_MR0_OP, op);
+	if (mr0 != 0 || !rpc || !rpc->control_mailbox) {
+		return -1;
+	}
 
-	err = rpcmsg_event_tx(&rpc->device_event, mr0, mr1, mr2, mr3);
+	err = virtioso_control_event_publish(rpc->control_mailbox, op,
+					     mr1, mr2, mr3);
 	if (err) {
 		return err;
 	}
@@ -485,6 +490,10 @@ static inline int vso_rpc_init(vso_rpc_t *rpc,
 
 	rpc->device_event = devevt_queue(iobuf);
 	rpc->mmio_slots = ((rpcmsg_iobuf_t *)iobuf)->mmio_slots;
+	rpc->control_mailbox =
+		(virtioso_control_mailbox_t *)((uintptr_t)iobuf +
+					       sizeof(rpcmsg_iobuf_t) +
+					       sizeof(virtioso_backend_mailbox_t));
 
 	rpc->doorbell = doorbell;
 	rpc->doorbell_cookie = doorbell_cookie;
