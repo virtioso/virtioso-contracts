@@ -77,6 +77,9 @@ typedef enum vio_trace_event_id {
     /* MMIO slot lifecycle marker:
      * a0=slot, a1=mmio_generation, a2=phase_id, a3=aux. */
     VIO_TRACE_EV_MMIO_SLOT_STATE = 37,
+    /* Backend mailbox/vmfd MMIO lifecycle marker:
+     * a0=phase_id, a1=generation_or_token, a2=arg0, a3=arg1. */
+    VIO_TRACE_EV_BACKEND_MMIO_STATE = 38,
 } vio_trace_event_id_t;
 
 typedef enum vio_trace_mmio_slot_phase_id {
@@ -85,6 +88,23 @@ typedef enum vio_trace_mmio_slot_phase_id {
     VIO_TRACE_MMIO_SLOT_REQUEUE = 3,
     VIO_TRACE_MMIO_SLOT_COMPLETE = 4,
 } vio_trace_mmio_slot_phase_id_t;
+
+typedef enum vio_trace_backend_mmio_phase_id {
+    VIO_TRACE_BACKEND_MMIO_ASYNC_PUBLISH = 1,
+    VIO_TRACE_BACKEND_MMIO_BLOCKING_PUBLISH = 2,
+    VIO_TRACE_BACKEND_MMIO_KMOD_CLAIM = 3,
+    VIO_TRACE_BACKEND_MMIO_KMOD_DELEGATE = 4,
+    VIO_TRACE_BACKEND_MMIO_KMOD_REQUEUE = 5,
+    VIO_TRACE_BACKEND_MMIO_QEMU_RECV = 6,
+    VIO_TRACE_BACKEND_MMIO_QEMU_COMPLETE = 7,
+    VIO_TRACE_BACKEND_MMIO_KMOD_COMPLETE = 8,
+    VIO_TRACE_BACKEND_MMIO_VMM_DRAIN = 9,
+    VIO_TRACE_BACKEND_MMIO_VMM_RESPOND = 10,
+    VIO_TRACE_BACKEND_MMIO_BLOCKING_WAIT_ENTER = 11,
+    VIO_TRACE_BACKEND_MMIO_BLOCKING_WAIT_WAKE = 12,
+    VIO_TRACE_BACKEND_MMIO_PUBLISH_ERROR = 13,
+    VIO_TRACE_BACKEND_MMIO_COMPLETE_ERROR = 14,
+} vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
     uint64_t a0;

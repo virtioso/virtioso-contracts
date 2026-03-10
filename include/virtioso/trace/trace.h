@@ -85,3 +85,12 @@ static inline void vio_trace_mmio_slot_state(uint64_t slot,
     vio_trace_emit(VIO_TRACE_EV_MMIO_SLOT_STATE, slot, generation,
                    phase_id, aux);
 }
+
+static inline void vio_trace_backend_mmio_state(uint64_t phase_id,
+                                                uint64_t generation_or_token,
+                                                uint64_t arg0,
+                                                uint64_t arg1)
+{
+    vio_trace_emit(VIO_TRACE_EV_BACKEND_MMIO_STATE, phase_id,
+                   generation_or_token, arg0, arg1);
+}
