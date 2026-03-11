@@ -166,6 +166,10 @@ typedef enum vio_trace_backend_mmio_phase_id {
     VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_IOMMU_START = 54,
     VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_IOTLB = 55,
     VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_SECTION = 56,
+    /* Host cache-init checkpoints:
+     * a1=cache token, a2=mr or offset, a3=packed meta. */
+    VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_INIT = 57,
+    VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_INIT_SECTION = 58,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
