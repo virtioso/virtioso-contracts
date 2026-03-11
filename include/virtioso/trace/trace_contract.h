@@ -131,6 +131,17 @@ typedef enum vio_trace_backend_mmio_phase_id {
      * a1=queue index, a2=aux0, a3=aux1. */
     VIO_TRACE_BACKEND_MMIO_QEMU_VQ_SETUP = 30,
     VIO_TRACE_BACKEND_MMIO_QEMU_SPLIT_EMPTY = 31,
+    /* Shared-memory mapping checkpoints:
+     * a1=region_or_queue_id, a2=addr_or_ptr, a3=packed size/attr detail. */
+    VIO_TRACE_BACKEND_MMIO_KMOD_MEM_MAP_SET = 32,
+    VIO_TRACE_BACKEND_MMIO_QEMU_RAM_MAP = 33,
+    VIO_TRACE_BACKEND_MMIO_VMM_RAM_DATAPORT_SETUP = 34,
+    VIO_TRACE_BACKEND_MMIO_VMM_RAM_DATAPORT_MAP = 35,
+    VIO_TRACE_BACKEND_MMIO_LIBSEL4VM_RESERVE_MEMORY = 36,
+    VIO_TRACE_BACKEND_MMIO_LIBSEL4VM_MAP_RESERVATION = 37,
+    VIO_TRACE_BACKEND_MMIO_QEMU_REGION_CACHE_DESC = 38,
+    VIO_TRACE_BACKEND_MMIO_QEMU_REGION_CACHE_AVAIL = 39,
+    VIO_TRACE_BACKEND_MMIO_QEMU_REGION_CACHE_USED = 40,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
