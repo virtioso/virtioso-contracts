@@ -176,6 +176,13 @@ typedef enum vio_trace_backend_mmio_phase_id {
     VIO_TRACE_BACKEND_MMIO_GUEST_DMA_ALLOC_ENTER = 60,
     VIO_TRACE_BACKEND_MMIO_GUEST_DMA_ALLOC_RESULT = 61,
     VIO_TRACE_BACKEND_MMIO_GUEST_VRING_ALLOC = 62,
+    /* Guest virtio probe checkpoints:
+     * a1=device or stage token, a2=aux0, a3=aux1/rc. */
+    VIO_TRACE_BACKEND_MMIO_GUEST_VIRTIO_DEV_PROBE = 63,
+    VIO_TRACE_BACKEND_MMIO_GUEST_VIRTIO_FEATURES_OK = 64,
+    VIO_TRACE_BACKEND_MMIO_GUEST_VIRTIO_PCI_MODERN_PROBE = 65,
+    VIO_TRACE_BACKEND_MMIO_GUEST_VIRTBLK_PROBE = 66,
+    VIO_TRACE_BACKEND_MMIO_GUEST_VIRTBLK_INIT_VQ = 67,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
