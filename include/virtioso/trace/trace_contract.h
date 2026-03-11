@@ -170,6 +170,12 @@ typedef enum vio_trace_backend_mmio_phase_id {
      * a1=cache token, a2=mr or offset, a3=packed meta. */
     VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_INIT = 57,
     VIO_TRACE_BACKEND_MMIO_QEMU_CACHE_INIT_SECTION = 58,
+    /* Guest DMA allocation checkpoints:
+     * a1=device or queue token, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_GUEST_DMA_RESTRICTED_INIT = 59,
+    VIO_TRACE_BACKEND_MMIO_GUEST_DMA_ALLOC_ENTER = 60,
+    VIO_TRACE_BACKEND_MMIO_GUEST_DMA_ALLOC_RESULT = 61,
+    VIO_TRACE_BACKEND_MMIO_GUEST_VRING_ALLOC = 62,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
