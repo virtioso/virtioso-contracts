@@ -104,6 +104,22 @@ typedef enum vio_trace_backend_mmio_phase_id {
     VIO_TRACE_BACKEND_MMIO_BLOCKING_WAIT_WAKE = 12,
     VIO_TRACE_BACKEND_MMIO_PUBLISH_ERROR = 13,
     VIO_TRACE_BACKEND_MMIO_COMPLETE_ERROR = 14,
+    /* Shared virtqueue/ioeventfd checkpoints:
+     * a1=queue index or token, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_QEMU_VIRTQUEUE_KICK = 15,
+    VIO_TRACE_BACKEND_MMIO_QEMU_HOST_NOTIFIER = 16,
+    VIO_TRACE_BACKEND_MMIO_QEMU_NOTIFY_VQ = 17,
+    VIO_TRACE_BACKEND_MMIO_QEMU_GUEST_NOTIFY = 18,
+    /* Virtio-blk checkpoints:
+     * a1=queue index or status, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_QEMU_BLK_HANDLE_OUTPUT = 19,
+    VIO_TRACE_BACKEND_MMIO_QEMU_BLK_HANDLE_REQUEST = 20,
+    VIO_TRACE_BACKEND_MMIO_QEMU_BLK_REQ_COMPLETE = 21,
+    /* Virtio-serial checkpoints:
+     * a1=queue index or event, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_QEMU_SERIAL_HANDLE_OUTPUT = 22,
+    VIO_TRACE_BACKEND_MMIO_QEMU_SERIAL_CONTROL_OUT = 23,
+    VIO_TRACE_BACKEND_MMIO_QEMU_SERIAL_CONTROL_MSG = 24,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
