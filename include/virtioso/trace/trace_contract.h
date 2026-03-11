@@ -120,6 +120,17 @@ typedef enum vio_trace_backend_mmio_phase_id {
     VIO_TRACE_BACKEND_MMIO_QEMU_SERIAL_HANDLE_OUTPUT = 22,
     VIO_TRACE_BACKEND_MMIO_QEMU_SERIAL_CONTROL_OUT = 23,
     VIO_TRACE_BACKEND_MMIO_QEMU_SERIAL_CONTROL_MSG = 24,
+    /* Guest split virtqueue checkpoints:
+     * a1=queue index, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_GUEST_VQ_SETUP = 25,
+    VIO_TRACE_BACKEND_MMIO_GUEST_ADD_BUF = 26,
+    VIO_TRACE_BACKEND_MMIO_GUEST_AVAIL_PUBLISH = 27,
+    VIO_TRACE_BACKEND_MMIO_GUEST_KICK_PREPARE = 28,
+    VIO_TRACE_BACKEND_MMIO_GUEST_NOTIFY = 29,
+    /* Host split virtqueue visibility checkpoints:
+     * a1=queue index, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_QEMU_VQ_SETUP = 30,
+    VIO_TRACE_BACKEND_MMIO_QEMU_SPLIT_EMPTY = 31,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
