@@ -153,6 +153,10 @@ typedef enum vio_trace_backend_mmio_phase_id {
     VIO_TRACE_BACKEND_MMIO_GUEST_PCI_QUEUE_ADDRESS = 47,
     VIO_TRACE_BACKEND_MMIO_GUEST_PCI_QUEUE_ENABLE = 48,
     VIO_TRACE_BACKEND_MMIO_GUEST_PCI_NOTIFY_MAP = 49,
+    /* Host avail-ring cache/read checkpoints:
+     * a1=queue index, a2=aux0, a3=aux1. */
+    VIO_TRACE_BACKEND_MMIO_QEMU_REGION_CACHE_AVAIL_META = 50,
+    VIO_TRACE_BACKEND_MMIO_QEMU_AVAIL_READ = 51,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
