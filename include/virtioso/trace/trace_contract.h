@@ -197,6 +197,8 @@ typedef enum vio_trace_backend_mmio_phase_id {
     VIO_TRACE_BACKEND_MMIO_VMM_MAILBOX_SYNC_STATE = 79,
     VIO_TRACE_BACKEND_MMIO_KMOD_MAILBOX_SYNC_STATE = 80,
     VIO_TRACE_BACKEND_MMIO_VMM_SLOT_POST_SYNC_RAW = 81,
+    VIO_TRACE_BACKEND_MMIO_VMM_MAILBOX_MAPPING = 82,
+    VIO_TRACE_BACKEND_MMIO_KMOD_MAILBOX_MAPPING = 83,
 } vio_trace_backend_mmio_phase_id_t;
 
 typedef struct vio_trace_payload4 {
